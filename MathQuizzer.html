@@ -1,0 +1,274 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Interactive Math Quiz</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        @import url('https://fonts.googleapis.com/css2?family=Poppins:wght@400;600;700&display=swap');
+        body {
+            font-family: 'Poppins', sans-serif;
+            background-color: #cfe6f0;
+        }
+        .quiz-card {
+            background-color: #f2fbff;
+            color: #004151;
+        }
+        .btn-primary {
+            background-color: #004151;
+            color: #f8f9fb;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+        .btn-primary:hover {
+            background-color: #293f46;
+            transform: translateY(-2px);
+        }
+        .btn-secondary {
+            background-color: #ddf5ff;
+            color: #004151;
+            transition: background-color 0.3s ease, transform 0.2s ease;
+        }
+        .btn-secondary:hover {
+            background-color: #bdeaff;
+            transform: translateY(-2px);
+        }
+        .answer-input {
+            border-color: #ddf5ff;
+            color: #004151;
+        }
+        .answer-input:focus {
+            outline: none;
+            border-color: #004151;
+            box-shadow: 0 0 0 3px rgba(0, 65, 81, 0.2);
+        }
+        .timer-progress {
+            stroke: #004151;
+            stroke-linecap: round;
+            transform: rotate(-90deg);
+            transform-origin: 50% 50%;
+            transition: stroke-dashoffset 1s linear;
+        }
+        .timer-track {
+            stroke: #ddf5ff;
+        }
+        .solution-text {
+            white-space: pre-wrap;
+            background-color: #f8f9fb;
+            border-left: 4px solid #004151;
+            color: #293f46;
+        }
+        .feedback-correct {
+            color: #00876c;
+        }
+        .feedback-incorrect {
+            color: #de3730;
+        }
+        .modal-backdrop {
+            background-color: rgba(41, 63, 70, 0.7);
+        }
+    </style>
+</head>
+<body class="flex items-center justify-center min-h-screen p-4">
+
+    <div id="quiz-container" class="quiz-card w-full max-w-lg mx-auto rounded-2xl shadow-2xl p-6 sm:p-8 text-center transition-all duration-500">
+        
+        <!-- Start Screen -->
+        <div id="start-screen">
+            <h1 class="text-4xl sm:text-5xl font-bold mb-2">Math Whiz!</h1>
+            <p class="text-lg text-[#293f46] mb-8">Ready to test your skills?</p>
+            <button id="start-btn" class="btn-primary w-full sm:w-auto text-xl font-semibold py-3 px-10 rounded-full shadow-lg">
+                Start Quiz
+            </button>
+        </div>
+
+        <!-- Quiz Screen -->
+        <div id="quiz-screen" class="hidden">
+            <div class="relative w-32 h-32 mx-auto mb-6">
+                <svg class="w-full h-full" viewBox="0 0 100 100">
+                    <circle class="timer-track" cx="50" cy="50" r="45" fill="transparent" stroke-width="10"></circle>
+                    <circle id="timer-progress" class="timer-progress" cx="50" cy="50" r="45" fill="transparent" stroke-width="10" pathLength="100" stroke-dasharray="100" stroke-dashoffset="0"></circle>
+                </svg>
+                <span id="timer-text" class="absolute inset-0 flex items-center justify-center text-4xl font-bold text-[#004151]"></span>
+            </div>
+
+            <div id="question-container" class="mb-6 min-h-[72px]">
+                <p id="question-text" class="text-2xl sm:text-3xl font-semibold text-[#293f46]"></p>
+            </div>
+
+            <div id="input-container" class="flex flex-col sm:flex-row gap-3 items-center justify-center mb-6">
+                <input type="number" id="answer-input" class="answer-input text-2xl font-bold w-full sm:w-40 text-center p-3 border-2 rounded-lg transition-all duration-300" placeholder="Your Answer">
+                <button id="submit-btn" class="btn-primary w-full sm:w-auto font-semibold py-3 px-8 rounded-lg shadow-md">Submit</button>
+            </div>
+
+            <div id="result-container" class="hidden text-center space-y-4">
+                <p id="feedback-text" class="text-2xl font-bold"></p>
+                <p class="text-lg text-[#293f46]">The correct answer is: <span id="correct-answer-text" class="font-bold text-xl text-[#004151]"></span></p>
+                <div class="flex flex-col sm:flex-row gap-3 justify-center">
+                    <button id="solution-btn" class="btn-secondary font-semibold py-2 px-6 rounded-lg">Show Solution</button>
+                    <button id="next-btn" class="btn-primary font-semibold py-2 px-6 rounded-lg">Next Question</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Solution Modal -->
+    <div id="solution-modal" class="hidden fixed inset-0 z-50 flex items-center justify-center p-4 modal-backdrop">
+        <div class="quiz-card w-full max-w-md mx-auto rounded-2xl shadow-2xl p-6 text-left relative">
+            <button id="close-modal-btn" class="absolute top-3 right-4 text-3xl font-bold text-[#293f46] hover:text-[#de3730]">&times;</button>
+            <h3 class="text-2xl font-bold mb-4">Step-by-Step Solution</h3>
+            <p id="solution-text" class="solution-text p-4 rounded-md text-base"></p>
+        </div>
+    </div>
+
+    <script>
+        const startScreen = document.getElementById('start-screen');
+        const quizScreen = document.getElementById('quiz-screen');
+        const startBtn = document.getElementById('start-btn');
+        
+        const timerText = document.getElementById('timer-text');
+        const timerProgress = document.getElementById('timer-progress');
+        const questionText = document.getElementById('question-text');
+        const answerInput = document.getElementById('answer-input');
+        const submitBtn = document.getElementById('submit-btn');
+        
+        const resultContainer = document.getElementById('result-container');
+        const feedbackText = document.getElementById('feedback-text');
+        const correctAnswerText = document.getElementById('correct-answer-text');
+        const solutionBtn = document.getElementById('solution-btn');
+        const nextBtn = document.getElementById('next-btn');
+
+        const solutionModal = document.getElementById('solution-modal');
+        const solutionText = document.getElementById('solution-text');
+        const closeModalBtn = document.getElementById('close-modal-btn');
+
+        const TIMER_DURATION = 20;
+        let timerInterval;
+        let timeLeft;
+        let currentQuestion = {};
+
+        function generateQuestion() {
+            const operators = ['+', '-', '*', '/'];
+            const operator = operators[Math.floor(Math.random() * operators.length)];
+            let num1, num2, question, answer, solution;
+
+            switch (operator) {
+                case '+':
+                    num1 = Math.floor(Math.random() * 90) + 10; // 10-99
+                    num2 = Math.floor(Math.random() * 90) + 10; // 10-99
+                    answer = num1 + num2;
+                    question = `What is ${num1} + ${num2}?`;
+                    solution = `To solve this, we add the two numbers together.\n\nStep 1: Align the numbers by place value.\n   ${num1}\n+  ${num2}\n------\n\nStep 2: Add the ones column. Then add the tens column.\n\nThe sum of ${num1} and ${num2} is ${answer}.`;
+                    break;
+                case '-':
+                    num1 = Math.floor(Math.random() * 50) + 50; // 50-99
+                    num2 = Math.floor(Math.random() * 49) + 1;  // 1-49
+                    answer = num1 - num2;
+                    question = `What is ${num1} - ${num2}?`;
+                    solution = `To solve this, we subtract the second number from the first.\n\nStep 1: Align the numbers by place value.\n   ${num1}\n-  ${num2}\n------\n\nStep 2: Subtract the ones column. Then subtract the tens column, borrowing if necessary.\n\nThe difference between ${num1} and ${num2} is ${answer}.`;
+                    break;
+                case '*':
+                    num1 = Math.floor(Math.random() * 12) + 1; // 1-12
+                    num2 = Math.floor(Math.random() * 9) + 2;  // 2-10
+                    answer = num1 * num2;
+                    question = `What is ${num1} × ${num2}?`;
+                    solution = `Multiplication is repeated addition. We need to add ${num1} to itself ${num2} times (or vice versa).\n\nFor example, ${num1} × ${num2} is the same as adding ${num1} + ${num1} + ... (${num2} times).\n\nUsing multiplication tables:\n${num1} multiplied by ${num2} equals ${answer}.`;
+                    break;
+                case '/':
+                    answer = Math.floor(Math.random() * 10) + 2; // 2-11
+                    num2 = Math.floor(Math.random() * 10) + 2;   // 2-11
+                    num1 = answer * num2;
+                    question = `What is ${num1} ÷ ${num2}?`;
+                    solution = `Division is finding out how many times one number (${num2}) fits into another number (${num1}).\n\nYou can think of it as the opposite of multiplication: what number multiplied by ${num2} gives you ${num1}?\n\nSince ${num2} × ${answer} = ${num1}, we know that ${num1} ÷ ${num2} = ${answer}.`;
+                    break;
+            }
+            return { question, answer, solution };
+        }
+
+        function startTimer() {
+            timeLeft = TIMER_DURATION;
+            updateTimerDisplay();
+            timerInterval = setInterval(() => {
+                timeLeft--;
+                updateTimerDisplay();
+                if (timeLeft <= 0) {
+                    clearInterval(timerInterval);
+                    checkAnswer(true);
+                }
+            }, 1000);
+        }
+
+        function updateTimerDisplay() {
+            timerText.textContent = timeLeft;
+            const progress = (timeLeft / TIMER_DURATION) * 100;
+            timerProgress.style.strokeDashoffset = 100 - progress;
+        }
+
+        function loadNextQuestion() {
+            currentQuestion = generateQuestion();
+            questionText.textContent = currentQuestion.question;
+            
+            resultContainer.classList.add('hidden');
+            answerInput.value = '';
+            answerInput.disabled = false;
+            submitBtn.disabled = false;
+            answerInput.focus();
+            
+            startTimer();
+        }
+
+        function checkAnswer(isTimeout = false) {
+            clearInterval(timerInterval);
+            answerInput.disabled = true;
+            submitBtn.disabled = true;
+
+            const userAnswer = parseInt(answerInput.value, 10);
+            
+            if (isTimeout) {
+                feedbackText.textContent = "Time's Up!";
+                feedbackText.className = 'text-2xl font-bold feedback-incorrect';
+            } else if (userAnswer === currentQuestion.answer) {
+                feedbackText.textContent = 'Correct!';
+                feedbackText.className = 'text-2xl font-bold feedback-correct';
+            } else {
+                feedbackText.textContent = 'Not Quite!';
+                feedbackText.className = 'text-2xl font-bold feedback-incorrect';
+            }
+
+            correctAnswerText.textContent = currentQuestion.answer;
+            resultContainer.classList.remove('hidden');
+        }
+
+        startBtn.addEventListener('click', () => {
+            startScreen.classList.add('hidden');
+            quizScreen.classList.remove('hidden');
+            loadNextQuestion();
+        });
+
+        submitBtn.addEventListener('click', () => checkAnswer());
+        answerInput.addEventListener('keydown', (e) => {
+            if (e.key === 'Enter') {
+                checkAnswer();
+            }
+        });
+
+        nextBtn.addEventListener('click', loadNextQuestion);
+
+        solutionBtn.addEventListener('click', () => {
+            solutionText.textContent = currentQuestion.solution;
+            solutionModal.classList.remove('hidden');
+        });
+
+        closeModalBtn.addEventListener('click', () => {
+            solutionModal.classList.add('hidden');
+        });
+        
+        solutionModal.addEventListener('click', (e) => {
+            if (e.target === solutionModal) {
+                solutionModal.classList.add('hidden');
+            }
+        });
+
+    </script>
+</body>
+</html>
